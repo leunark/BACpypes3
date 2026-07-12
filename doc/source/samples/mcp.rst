@@ -146,4 +146,6 @@ The ``host`` defaults to loopback. Only bind to ``0.0.0.0`` behind an
 authenticating proxy — FastMCP has no built-in authentication.
 
 Reference: :ref:`mini-device-with-mcp.py`. For a shell-only client that
-drives the same server with ``curl``, see :ref:`mini-device-mcp.sh`.
+drives the same server with ``curl``, see :ref:`mini-device-mcp.sh`. To
+drive it from a fully local LLM (Ollama + ``mcphost``/``kit``), see
+:ref:`mini-device-ollama`.

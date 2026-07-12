@@ -33,4 +33,5 @@ four local objects hosted here.
 
 See :ref:`bacpypes3.mcp` for the full tool list and public API. For a
 minimal shell-only client that drives this server with ``curl``, see
-:ref:`mini-device-mcp.sh`.
+:ref:`mini-device-mcp.sh`. To drive it from a local LLM instead, see
+:ref:`mini-device-ollama`.

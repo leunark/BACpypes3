@@ -135,6 +135,7 @@ library, run stand-alone (stdio), or embedded in a long-running server
     mcp.rst
     mini-device-with-mcp.rst
     mini-device-mcp.sh.rst
+    mini-device-ollama.rst
 
 Docker Samples
 --------------
