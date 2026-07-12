@@ -31,4 +31,6 @@ returns *this* server's identity and object list; ``read_property`` and
 devices, and remote BACnet clients can independently poll and command the
 four local objects hosted here.
 
-See :ref:`bacpypes3.mcp` for the full tool list and public API.
+See :ref:`bacpypes3.mcp` for the full tool list and public API. For a
+minimal shell-only client that drives this server with ``curl``, see
+:ref:`mini-device-mcp.sh`.

@@ -145,4 +145,5 @@ registered.
 The ``host`` defaults to loopback. Only bind to ``0.0.0.0`` behind an
 authenticating proxy — FastMCP has no built-in authentication.
 
-Reference: :ref:`mini-device-with-mcp.py`.
+Reference: :ref:`mini-device-with-mcp.py`. For a shell-only client that
+drives the same server with ``curl``, see :ref:`mini-device-mcp.sh`.
