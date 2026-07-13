@@ -7,19 +7,19 @@ three processes on the same laptop:
 1. **`mini-device-with-mcp.py`** — the BACpypes3 mini-device sample, with an
    embedded MCP HTTP server on `http://127.0.0.1:8765/mcp`.
 2. **Ollama** — serving a local model that supports tool calling.
-3. **An MCP host** (`mcphost`) that connects the two: it pulls the tool list
-   from BACpypes3, hands it to the Ollama model, and executes any tool calls
-   the model decides to make.
+3. **`ollmcp`** — a small MCP host that connects the two: it pulls the tool
+   list from BACpypes3, hands it to the Ollama model, and executes any tool
+   calls the model decides to make.
 
 The result: you type an English request into the terminal, the local model
 plans and executes BACnet operations against the embedded device, and you
 see the read/write results come back.
 
 ```
-  You  ──►  mcphost  ──►  Ollama (local model, decides which tools to call)
-                  │
-                  └──►  bacpypes3.mcp HTTP server  ──►  Application  ──►  BACnet network
-                        (mini-device-with-mcp.py)
+  You  ──►  ollmcp  ──►  Ollama (local model, decides which tools to call)
+                 │
+                 └──►  bacpypes3.mcp HTTP server  ──►  Application  ──►  BACnet network
+                       (mini-device-with-mcp.py)
 ```
 
 ---
@@ -40,28 +40,19 @@ see the read/write results come back.
 - **A tool-capable Ollama model.** Ollama's model library flags each entry
   that supports tool calling; browse
   <https://ollama.com/search?c=tools> and pick one that fits your RAM. The
-  examples below use `qwen3.5:8b` (a good starting point at ~5 GB); if your
+  examples below use `qwen3.5:9b` (a good starting point at ~5 GB); if your
   machine is tight on RAM try `gemma4:2b`, and if you have a workstation-class
   GPU `qwen3.5:22b` or larger will follow instructions more reliably.
   Whichever you pick, the model page must show a **Tools** badge — models
   without tool support cannot drive MCP servers.
 
-      ollama pull qwen3.5:8b
+      ollama pull qwen3.5:9b
 
-- **An MCP host.** This walkthrough uses [`mcphost`](https://github.com/mark3labs/mcphost)
-  because its config format is simple and well documented. The project is
-  archived (still functional, no longer receiving updates); the actively
-  maintained successor with an identical `mcpServers` config schema is
-  [`kit`](https://github.com/mark3labs/kit). Either works; substitute the
-  binary name as needed.
-
-      # requires Go 1.23+
-      go install github.com/mark3labs/mcphost@latest
-
-  Or for `kit`:
-
-      npm install -g @mark3labs/kit
-      # or: go install github.com/mark3labs/kit/cmd/kit@latest
+- **[`ollmcp`](https://github.com/jonigl/mcp-client-for-ollama).** A tiny
+  Ollama-native MCP client — no config file, no compilation, no daemon; the
+  Ollama host URL, MCP server URL, and model name are all passed on the
+  command line. If you have `uv` installed there is nothing to install
+  separately — `uvx ollmcp` fetches and runs it on demand.
 
 ---
 
@@ -102,61 +93,47 @@ ollama serve
 Confirm the model responds:
 
 ```
-ollama run qwen3.5:8b "hello"
+ollama run qwen3.5:9b "hello"
 ```
 
 The first prompt loads the model into memory (10–60 seconds depending on
 size); subsequent prompts are fast.
 
-## Step 3 — configure `mcphost` to see the BACpypes3 server
-
-Create `~/.mcphost.yml` (or `~/.mcphost.json`) with a **remote** MCP server
-entry pointing at the local BACpypes3 endpoint:
-
-```yaml
-mcpServers:
-  bacpypes3:
-    type: remote
-    url: http://127.0.0.1:8765/mcp
-```
-
-- `type: remote` selects the Streamable-HTTP transport, which is what
-  BACpypes3 serves. mcphost handles the `initialize` handshake,
-  `Mcp-Session-Id` header, and `notifications/initialized` automatically —
-  the details `mini-device-mcp.sh` performs by hand.
-- No `headers` block is needed: `bacpypes3.mcp` has no authentication (do
-  not expose it beyond loopback without an auth proxy).
-- The server name (`bacpypes3` here) is the label mcphost uses when it
-  presents the tools to the model; pick anything descriptive.
-
-The `kit` equivalent lives at `~/.kit.yml` and uses the identical schema.
-
-## Step 4 — run the host with the Ollama model
+## Step 3 — run `ollmcp` against both endpoints
 
 In terminal 2:
 
 ```
-mcphost --model ollama/qwen3.5:8b
+uvx ollmcp \
+    --host http://localhost:11434/ \
+    --mcp-server-url http://127.0.0.1:8765/mcp \
+    --model qwen3.5:9b
 ```
 
 Flag breakdown:
 
-- `--model ollama/<model>` picks the provider and model. Any model on
-  Ollama's tool-calling list works; swap `qwen3.5:8b` for the model you
-  pulled.
-- mcphost auto-discovers the config file in your home directory (add
-  `--config /path/to/file` to point elsewhere).
-- `OLLAMA_HOST=http://otherhost:11434 mcphost …` points at a non-local
-  Ollama daemon.
+- `--host` is the Ollama daemon's HTTP endpoint. `http://localhost:11434/`
+  is the Ollama default; point it elsewhere if the daemon is on another
+  machine.
+- `--mcp-server-url` is BACpypes3's Streamable-HTTP MCP endpoint — `ollmcp`
+  handles the `initialize` handshake, `Mcp-Session-Id` header, and
+  `notifications/initialized` automatically, so the details
+  `mini-device-mcp.sh` performs by hand are done for you.
+- `--model` picks the Ollama model to drive. Any model on Ollama's
+  tool-calling list works; swap `qwen3.5:9b` for the model you pulled.
 
-mcphost starts an interactive REPL, connects to `http://127.0.0.1:8765/mcp`,
-lists the BACpypes3 tools (`who_is`, `read_property`, `write_property`,
-`read_property_multiple`, `get_config`, …), and passes them to the model.
+`bacpypes3.mcp` has no authentication (do not expose it beyond loopback
+without an auth proxy), so no additional headers or credentials are needed.
 
-## Step 5 — talk to your BACnet device
+`ollmcp` starts an interactive REPL, connects to
+`http://127.0.0.1:8765/mcp`, lists the BACpypes3 tools (`who_is`,
+`read_property`, `write_property`, `read_property_multiple`, `get_config`,
+…), and passes them to the model.
 
-Try prompts like these — mcphost prints each tool invocation and its result
-so you can see the model's plan unfold:
+## Step 4 — talk to your BACnet device
+
+Try prompts like these — `ollmcp` prints each tool invocation and its
+result so you can see the model's plan unfold:
 
 ```
 > Discover BACnet devices on this network.
@@ -195,9 +172,11 @@ tools even when they're listed. Try a larger tool-calling model
 window with `OLLAMA_CONTEXT_LENGTH=8192` before starting Ollama. Verify the
 model's Ollama page shows the **Tools** badge.
 
-**"connection refused" from mcphost.** Check that `mini-device-with-mcp.py`
+**"connection refused" from `ollmcp`.** Check that `mini-device-with-mcp.py`
 is still running and that its logs show the MCP server listening. `curl
-http://127.0.0.1:8765/mcp` should respond (not connect-refused).
+http://127.0.0.1:8765/mcp` should respond (not connect-refused). If the
+error mentions the Ollama endpoint instead, confirm `ollama serve` is up
+and that `--host` matches the port it's listening on.
 
 **Tool call succeeds but returns an error dict.** BACpypes3 wraps protocol
 errors as `{"error": "...", "errorClass": "...", "errorCode": "..."}`
