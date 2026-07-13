@@ -26,6 +26,7 @@
 # Usage:
 #     ./mini-device-mcp.sh                          # default host/port + demo
 #     MCP_URL=http://host:port/mcp ./mini-device-mcp.sh
+#     ./mini-device-mcp.sh list_tools               # dump advertised tools
 #     ./mini-device-mcp.sh who_is                   # single tool
 #     ./mini-device-mcp.sh read_property 192.168.1.10 analog-input,1 present-value
 # ---------------------------------------------------------------------------
@@ -119,7 +120,23 @@ initialized() {
 }
 
 # ---------------------------------------------------------------------------
-# 3. call_tool NAME ARGUMENTS_JSON — invoke a tool by name.
+# 3. list_tools — dump the tools the server is advertising, including the
+#    description text the model would see. Useful for sanity-checking that
+#    the server you're talking to is the version you think it is (e.g. after
+#    a docstring change to bacpypes3/mcp.py).
+# ---------------------------------------------------------------------------
+list_tools() {
+    echo
+    echo "[list] tools/list"
+    curl "${CURL_COMMON[@]}" \
+        -H "Mcp-Session-Id: $SID" \
+        -X POST "$MCP_URL" \
+        --data '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+    | sse_body | pp
+}
+
+# ---------------------------------------------------------------------------
+# 4. call_tool NAME ARGUMENTS_JSON — invoke a tool by name.
 #    ARGUMENTS_JSON is a JSON object (use '{}' for no arguments). The tool's
 #    structured return is at result.structuredContent.result in the reply.
 # ---------------------------------------------------------------------------
@@ -171,9 +188,11 @@ main() {
     initialized
 
     if [[ $# -eq 0 ]]; then
-        # Default demo: discover devices, announce this side, then read a
+        # Default demo: list the tools the server advertises (with their
+        # descriptions), discover devices, announce this side, then read a
         # property from the embedded server's own commandable-av (which the
         # mini-device-with-mcp.py sample registers as analog-value,2).
+        list_tools
         who_is
         i_am
         # Read from the embedded server itself. Adjust ADDRESS to any host
@@ -187,6 +206,9 @@ main() {
     # JSON arguments object.
     local tool="$1"; shift
     case "$tool" in
+        list_tools|tools|tools/list)
+            list_tools
+            ;;
         who_is|i_am)
             "$tool"
             ;;
