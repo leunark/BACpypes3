@@ -199,16 +199,25 @@ async def who_is(
     ----------
     low_limit, high_limit : int, optional
         Restrict responses to devices whose instance number falls in
-        ``[low_limit, high_limit]`` (inclusive). Both must be given together
-        or both omitted. Instance numbers are 0..4194302. Use this to
-        target a single device: ``low_limit=1234, high_limit=1234``.
+        ``[low_limit, high_limit]`` (inclusive). Instance numbers are
+        0..4194302. As a convenience, if ``low_limit`` is given but
+        ``high_limit`` is omitted, ``high_limit`` defaults to
+        ``low_limit`` — so passing ``low_limit=1234`` alone targets the
+        single device with instance 1234.
     address : str, optional
         Destination address. Omit (or ``None``) to broadcast on the local
-        network — the usual case. Examples:
+        network — the usual case. If a device instance range is given
+        (``low_limit``/``high_limit``) and ``address`` is omitted, this
+        tool defaults to the BACnet global broadcast ``"*:*"`` so the
+        search reaches devices behind BACnet routers on other networks;
+        pass ``address`` explicitly to override. Examples:
         ``"192.168.1.10"`` (single unicast host),
         ``"192.168.1.255"`` (local broadcast),
         ``"2:5"`` (remote network 2, station 5),
-        ``"3:*"`` (remote-network broadcast to network 3).
+        ``"3:*"`` (remote-network broadcast to network 3),
+        ``"*:*"`` (BACnet global broadcast — forwarded by BACnet routers
+        to every reachable network; use when devices may live behind
+        routers and you don't know which network they're on).
 
     Returns
     -------
@@ -225,6 +234,14 @@ async def who_is(
     if _debug:
         who_is._debug("who_is %r %r %r", low_limit, high_limit, address)
     app = get_application()
+
+    # Novice-friendly defaults: a lone low_limit targets a single device,
+    # and a bounded instance range with no address falls back to global
+    # broadcast so devices behind BACnet routers are reachable.
+    if low_limit is not None and high_limit is None:
+        high_limit = low_limit
+    if address is None and (low_limit is not None or high_limit is not None):
+        address = "*:*"
 
     i_ams = await app.who_is(low_limit, high_limit, _address(address))
     return [_i_am_to_json(i_am) for i_am in i_ams]

@@ -161,6 +161,13 @@ so you can see the model's plan unfold:
 ```
 > Discover BACnet devices on this network.
 
+> Discover every BACnet device on the entire intranet, including any that
+  sit behind BACnet routers on other networks.
+
+> Find every BACnet device with an instance number between 1000 and 1999.
+
+> Find the BACnet device with instance number 3456 and tell me its address.
+
 > Read the present value of analog-value,1 on device 3456.
 
 > Show me the configuration of the local BACpypes3 server.
